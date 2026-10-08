@@ -1,10 +1,8 @@
-// Paste YOUR Firebase web-app settings here (Firebase console > Project settings > Your apps).
-// These values are not secret - your data is protected by the rules in firestore.rules.
 export const firebaseConfig = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyAM1XVsPNrp3sA6T0---CGq6gpLnWFhvXs",
+  authDomain: "hangout-planner-68b35.firebaseapp.com",
+  projectId: "hangout-planner-68b35",
+  storageBucket: "hangout-planner-68b35.firebasestorage.app",
+  messagingSenderId: "1036067698926",
+  appId: "1:1036067698926:web:7845969b519a7f41215bff"
 };
