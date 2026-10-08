@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hangout Planner</title>
+<style>
+:root{--bg:#f6f5fb;--card:#fff;--ink:#1f1d2e;--mut:#6b6880;--pri:#6c4cf1;--free:#0b7a54;--freebg:#d9f5e8;--busy:#b4233a;--busybg:#fde2e6;--away:#955200;--awaybg:#ffecc9;--hang:#1a5fc9;--hangbg:#dbe8ff;--line:#e5e2f0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14121f;--card:#1e1b2e;--ink:#eeecf7;--mut:#a29fb8;--pri:#9b84ff;--free:#5fe0a8;--freebg:#12382b;--busy:#ff8a9c;--busybg:#40161e;--away:#ffc266;--awaybg:#3d2c0c;--hang:#8db8ff;--hangbg:#142a4d;--line:#34304b}}
+:root[data-theme="dark"]{--bg:#14121f;--card:#1e1b2e;--ink:#eeecf7;--mut:#a29fb8;--pri:#9b84ff;--free:#5fe0a8;--freebg:#12382b;--busy:#ff8a9c;--busybg:#40161e;--away:#ffc266;--awaybg:#3d2c0c;--hang:#8db8ff;--hangbg:#142a4d;--line:#34304b}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+#top{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+#app{max-width:900px;margin:0 auto;padding:4px 14px 96px}
+h1,h2,h3{margin:0}h2{font-size:17px;margin:18px 0 8px}h3{font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{justify-content:space-between}
+.mut{color:var(--mut);font-size:13px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+button.sel{outline:2px solid var(--pri)}button.danger{color:var(--busy)}
+input,select,textarea{font:inherit;width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}label.inl{display:flex;gap:6px;align-items:center;color:var(--ink)}label.inl input{width:auto}
+.pill{display:inline-flex;gap:4px;align-items:center;padding:3px 9px;border-radius:99px;font-size:13px;font-weight:600}
+.free{background:var(--freebg);color:var(--free)}.busy{background:var(--busybg);color:var(--busy)}.away{background:var(--awaybg);color:var(--away)}.hang{background:var(--hangbg);color:var(--hang)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--pri);color:#fff;display:grid;place-items:center;font-size:18px;flex:none}
+.big{font-size:18px;font-weight:700}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:6}
+nav button{flex:1;border:0;border-radius:0;background:none;font-size:11px;padding:8px 2px;color:var(--mut)}nav button b{display:block;font-size:19px}nav button.on{color:var(--pri);font-weight:700}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;min-width:720px;width:100%}td,th{border:1px solid var(--line);padding:4px;vertical-align:top;font-size:12px;text-align:left}
+th:first-child,td:first-child{position:sticky;left:0;background:var(--card);min-width:84px}th.today{background:var(--hangbg)}
+.chip{display:block;width:100%;margin:2px 0;padding:3px 5px;font-size:11px;border-radius:7px;text-align:left;border:0}
+.tl{position:relative;min-width:960px;height:34px;border-bottom:1px solid var(--line)}
+.bar{position:absolute;top:3px;height:28px;font-size:11px;overflow:hidden;white-space:nowrap;padding:2px 4px;border:0;border-radius:7px}
+.tick{position:absolute;font-size:10px;color:var(--mut);border-left:1px solid var(--line);height:100%;padding-left:2px}
+.month{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.mc{min-height:62px;padding:4px;font-size:12px;text-align:left}
+#modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;justify-content:center;z-index:20}
+#modal.on{display:flex}#modal>div{background:var(--bg);width:100%;max-width:520px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px}
+.err{color:var(--busy);font-size:13px;margin-top:6px;font-weight:600}
+</style></head><body>
+<div id="top"></div><main id="app"></main><nav id="nav"></nav><div id="modal"></div>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {getAuth,signInAnonymously} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {getFirestore,doc,collection,setDoc,updateDoc,deleteDoc,addDoc,onSnapshot,query,orderBy,limit} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import {firebaseConfig} from './config.js';
+// Connects the app to Firebase and exposes a tiny DB helper (doc / collection) used by the code below.
+window.firebaseReady=(async()=>{
+  if(String(firebaseConfig.apiKey).startsWith('PASTE'))throw new Error('config.js not filled in');
+  const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+  const cred=await signInAnonymously(auth);
+  const snap=s=>({id:s.id,exists:s.exists(),data:()=>s.data()});
+  const Q=(q,base)=>({orderBy:(f,d)=>Q(query(q,orderBy(f,d)),base),limit:n=>Q(query(q,limit(n)),base),
+    onSnapshot:(n,e)=>onSnapshot(q,s=>n({docs:s.docs.map(snap)}),e),add:d=>addDoc(base,d)});
+  const DB={doc:p=>{const r=doc(db,p);return{set:d=>setDoc(r,d),update:d=>updateDoc(r,d),delete:()=>deleteDoc(r),onSnapshot:(n,e)=>onSnapshot(r,s=>n(snap(s)),e)}},
+    collection:p=>{const c=collection(db,p);return Q(c,c)}};
+  return {DB,uid:cred.user.uid};
+})();
+</script>
+<script>
+/* ============ 1. HELPERS (small utility functions) ============ */
+const $=s=>document.querySelector(s);
+const ICON={free:'✅',busy:'⛔',away:'✈️',hang:'📅'},LABEL={free:'Free',busy:'Busy',away:'Away',hang:'Hangout planned'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseD=s=>new Date(s+'T00:00');
+const addDays=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return iso(d)};
+const fmtDay=(s,long)=>parseD(s).toLocaleDateString('en',{weekday:long?'long':'short',month:'short',day:'numeric'});
+const tm=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60);return `${h%12||12}:${pad(m%60)} ${h<12?'AM':'PM'}`};
+const tmS=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60);return `${h%12||12}${m%60?':'+pad(m%60):''}${h<12?'a':'p'}`};
+const toMin=v=>{const[h,m]=v.split(':');return +h*60+ +m};
+const toTime=m=>`${pad(Math.floor(m/60)%24)}:${pad(m%60)}`;
+const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
+const newId=()=>Math.random().toString(36).slice(2,9);
+const TODAY=iso(new Date());
+const LOCS=['SRM Campus','Kattankulathur','Chennai','Home','Cafe','Mall'];
+
+/* ============ 2. DATA STORE (live, shared database) ============ */
+// Raw documents arrive from the database; rebuild() turns them into the simple object S that every page reads.
+let S={me:null,group:null,members:[],avail:[],away:[],hangouts:[],notes:[]};
+let DB,USER,UID=null,OWNER=false,CAN=true,READY=false,MSG='',MYCODE='';
+let ME=null,G=null,MEMBERS=[],AV=[],HG=[],RS=[],ACT=[];const loaded=new Set();
+const isAdmin=()=>!!(S.me&&S.me.admin);
+const mem=id=>S.members.find(m=>m.id===id)||{name:'Former member',emoji:'👤'};
+const RSM=u=>(RS.find(r=>r.id===u)||{}).map||{};
+let chain=Promise.resolve();
+const queue=fn=>{chain=chain.then(fn).catch(e=>{console.error(e);alert('Could not save ('+(e.code||e.message)+'). You may not have permission.')})};
+// Each person writes ONLY their own availability document (the database rules enforce this).
+const writeFor=uid=>DB.doc('avail/'+uid).set({entries:S.avail.filter(e=>e.uid===uid).map(({uid:_,...e})=>e),away:S.away.filter(w=>w.uid===uid).map(({uid:_,...w})=>w)});
+const save=()=>queue(()=>writeFor(UID));
+const note=t=>queue(()=>DB.collection('activity').add({t:Date.now(),text:t.replace(/^You /,(S.me?.name||'Someone')+' '),by:UID}));
+const norm=s=>s.toUpperCase().replace(/[^A-Z0-9]/g,'');
+const genCode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=crypto.getRandomValues(new Uint8Array(10));const c=[...r].map(x=>a[x%32]).join('');return c.slice(0,5)+'-'+c.slice(5)};
+const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s.toUpperCase().replace(/[^A-Z0-9]/g,''))))].map(b=>b.toString(16).padStart(2,'0')).join('');
+let rt;function schedule(){clearTimeout(rt);rt=setTimeout(()=>{const a=document.activeElement;if(a&&$('#app').contains(a)&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))return schedule();render()},300)}
+function rebuild(){
+  S.group=G;S.members=MEMBERS.map(m=>({...m,admin:!!G&&m.id===G.ownerId}));
+  OWNER=!!G&&G.ownerId===UID;S.me=ME?(S.members.find(m=>m.id===UID)||{...ME,id:UID,admin:OWNER}):null;
+  const ok=id=>S.members.some(m=>m.id===id);S.avail=[];S.away=[];
+  AV.filter(d=>ok(d.id)).forEach(d=>{(d.entries||[]).forEach(e=>S.avail.push({...e,uid:d.id}));(d.away||[]).forEach(w=>S.away.push({...w,uid:d.id}))});
+  S.hangouts=HG.map(h=>({...h,rsvp:Object.fromEntries((h.invited||[]).filter(ok).map(u=>[u,RSM(u)[h.id]||'']))}));
+  let seen=0;try{seen=+localStorage.getItem('hp-seen')||0}catch(e){}
+  S.notes=ACT.map(a=>({t:a.text,time:new Date(a.t).toISOString(),read:a.by===UID||a.t<=seen}));
+  if(loaded.has('g')&&loaded.has('me')&&(!ME||['m','a','h','r','n'].every(k=>loaded.has(k))))READY=true;schedule()}
+async function start(){
+  const fb=await (window.firebaseReady||Promise.reject()).catch(e=>{console.error(e);return null});
+  if(!fb){MSG='Could not connect to the database. Open config.js and paste your Firebase settings (see README).';READY=true;return render()}
+  DB=fb.DB;UID=fb.uid;const err=e=>console.error(e);let full=false;
+  const sub=(name,ref,fn)=>ref.onSnapshot(s=>{fn(s);loaded.add(name);rebuild()},err);
+  const go=()=>{if(full)return;full=true;
+    sub('m',DB.collection('members'),s=>MEMBERS=s.docs.map(d=>({id:d.id,...d.data()})));
+    sub('a',DB.collection('avail'),s=>AV=s.docs.map(d=>({id:d.id,...d.data()})));
+    sub('h',DB.collection('hangouts'),s=>HG=s.docs.map(d=>({id:d.id,...d.data()})));
+    sub('r',DB.collection('rsvps'),s=>RS=s.docs.map(d=>({id:d.id,...d.data()})));
+    sub('n',DB.collection('activity').orderBy('t','desc').limit(20),s=>ACT=s.docs.map(d=>d.data()))};
+  sub('g',DB.doc('group/main'),s=>G=s.exists?s.data():null);
+  sub('me',DB.doc('members/'+UID),s=>{ME=s.exists?s.data():null;if(ME)go()});
+  DB.doc('secret/main').onSnapshot(s=>{const c=s.exists?s.data().code:'';MYCODE=c?c.slice(0,5)+'-'+c.slice(5):'';schedule()},()=>{});
+  setTimeout(()=>{if(!READY){READY=true;render()}},5000)}
+
+/* ============ 3. AVAILABILITY LOGIC (the heart of the app) ============ */
+// Raw entries of one type for a date; entries that run past midnight spill into the next day.
+function entriesFor(uid,date,type){const out=[];
+  S.avail.filter(e=>e.uid===uid&&e.type===type).forEach(e=>{
+    if(e.date===date)out.push([e.start,e.nextDay?1440:e.end,e]);
+    if(e.nextDay&&addDays(e.date,1)===date)out.push([0,e.end,e])});
+  return out}
+// Free time = "free" entries minus "busy" entries. Overlapping free entries simply stack, so they never double count.
+function freeIv(uid,date,loc=''){const busy=entriesFor(uid,date,'busy'),res=[];
+  entriesFor(uid,date,'free').filter(x=>!loc||x[2].loc.toLowerCase().includes(loc)).forEach(([a,b,e])=>{
+    let parts=[[a,b]];
+    busy.forEach(([c,d])=>{parts=parts.flatMap(([x,y])=>d<=x||c>=y?[[x,y]]:[...(c>x?[[x,c]]:[]),...(d<y?[[d,y]]:[])])});
+    parts.forEach(([x,y])=>res.push([x,y,e]))});
+  return res}
+// Away periods clipped to one day (in minutes). Away never creates availability.
+function awayIv(uid,date){const s=parseD(date).getTime(),e=s+864e5;
+  return S.away.filter(w=>w.uid===uid).map(w=>[Math.max(+new Date(w.from),s),Math.min(+new Date(w.to),e)]).filter(([a,b])=>b>a).map(([a,b])=>[(a-s)/6e4,(b-s)/6e4])}
+function status(uid){const m=nowMin(),f=freeIv(uid,TODAY).find(([a,b])=>m>=a&&m<b);
+  if(f)return{k:'free',t:'Free until '+tm(f[1])};
+  if(awayIv(uid,TODAY).some(([a,b])=>m>=a&&m<b))return{k:'away',t:'Away'};
+  if(S.hangouts.some(h=>h.date===TODAY&&m>=h.start&&m<h.end&&h.rsvp[uid]==='going'))return{k:'hang',t:'At a hangout'};
+  return{k:'busy',t:entriesFor(uid,TODAY,'busy').some(([a,b])=>m>=a&&m<b)?'Busy':'Not free right now'}}
+// Sweep through the day: every stretch where >= min people overlap becomes a "slot".
+function findSlots(date,uids,min,minDur,loc=''){
+  const iv=uids.map(u=>[u,freeIv(u,date,loc)]);
+  const pts=[...new Set([0,1440,...iv.flatMap(([,l])=>l.flatMap(x=>[x[0],x[1]]))])].sort((a,b)=>a-b),segs=[];
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];
+    const who=iv.map(([u,l])=>[u,l.find(x=>x[0]<=a&&x[1]>=b)]).filter(w=>w[1]).map(([u,x])=>[u,x[2].loc]);
+    if(!who.length||who.length<min)continue;
+    const key=who.map(w=>w[0]).sort().join(),last=segs[segs.length-1];
+    if(last&&last.end===a&&last.key===key)last.end=b;else segs.push({date,start:a,end:b,key,who})}
+  return segs.filter(s=>s.end-s.start>=minDur).map(s=>({...s,n:s.who.length}))}
+function best(dates,uids,min,dur,loc=''){const nm=nowMin();
+  return dates.flatMap(d=>findSlots(d,uids,min,dur,loc)).filter(s=>s.date!==TODAY||s.end>nm)
+    .sort((a,b)=>b.n-a.n||(b.end-b.start)-(a.end-a.start)||a.date.localeCompare(b.date)||a.start-b.start)}
+const range=n=>[...Array(n)].map((_,i)=>addDays(TODAY,i));
+const allIds=()=>S.members.map(m=>m.id);
+
+/* ============ 4. SMALL UI PIECES ============ */
+const badge=(k,t)=>`<span class="pill ${k}">${ICON[k]} ${esc(t||LABEL[k])}</span>`;
+const avatar=m=>`<div class="av">${esc(m.emoji||m.name[0])}</div>`;
+let SLOTS=[];
+function locSummary(s){const c={};s.who.forEach(([,l])=>c[l||'Not set']=(c[l||'Not set']||0)+1);
+  return `<div class="mut">📍 ${Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([l,n])=>`${n} — ${esc(l)}`).join(' · ')}</div>`}
+function slotCard(s,i,label){SLOTS.push(s);const idx=SLOTS.length-1,miss=S.members.filter(m=>!s.who.some(w=>w[0]===m.id));
+  return `<div class="card"><div class="mut">${label||''}</div><div class="big">${fmtDay(s.date,1)}</div>
+  <div>🕒 ${tm(s.start)} – ${tm(s.end)}</div><div class="row" style="margin:6px 0">${badge('free',`${s.n}/${S.members.length} available`)}</div>
+  ${locSummary(s)}${miss.length?`<div class="mut">Can't make it: ${miss.map(m=>esc(m.name)).join(', ')}</div>`:''}
+  ${isAdmin()?`<button class="pri" style="margin-top:8px" data-a="slotHang" data-i="${idx}">＋ Create hangout</button>`:''}</div>`}
+function hangCard(h){const c={going:0,maybe:0,no:0},mine=h.rsvp[S.me.id],bad=Object.keys(h.rsvp).filter(u=>h.rsvp[u]==='going'&&mem(u).name!=='Former member'&&!freeIv(u,h.date).some(([a,b])=>a<=h.start&&b>=h.end));
+  Object.values(h.rsvp).forEach(v=>c[v]!==undefined&&c[v]++);
+  return `<div class="card"><div class="row sp"><h3>📅 ${esc(h.title)}</h3><span class="mut">by ${esc(mem(h.creator).name)}</span></div>
+  <div>${fmtDay(h.date,1)} · ${tm(h.start)} – ${tm(h.end)}</div><div class="mut">📍 ${esc(h.loc||'Location TBD')}${h.desc?' · '+esc(h.desc):''}</div>
+  <div class="row" style="margin:6px 0"><span class="pill free">Going: ${c.going}</span><span class="pill away">Maybe: ${c.maybe}</span><span class="pill busy">Can't go: ${c.no}</span></div>
+  ${bad.length?`<div class="err">⚠ Availability changed for ${bad.map(u=>esc(mem(u).name)).join(', ')} — please re-confirm.</div>`:''}
+  <div class="row" style="margin-top:6px">${[['going','Going'],['maybe','Maybe'],['no',"Can't go"]].map(([k,t])=>`<button class="${mine===k?'sel':''}" data-a="rsvp" data-id="${h.id}" data-v="${k}">${t}</button>`).join('')}
+  ${h.creator===S.me.id||isAdmin()?`<button data-a="editHang" data-id="${h.id}">Edit</button><button class="danger" data-a="delHang" data-id="${h.id}">Delete</button>`:''}</div></div>`}
+function memberRow(m){const st=status(m.id);
+  return `<div class="card row">${avatar(m)}<div style="flex:1"><b>${esc(m.name)}${m.id===S.me.id?' (you)':''}${m.admin?' 👑':''}</b><div class="mut">${esc(m.msg||'')}</div></div>${badge(st.k,st.t)}</div>`}
+
+/* ============ 5. PAGES ============ */
+function upcomingAvail(){const nm=nowMin(),rows=[];
+  range(7).forEach(d=>S.members.forEach(m=>entriesFor(m.id,d,'free').forEach(([a,b,e])=>{if(d===TODAY&&b<=nm)return;rows.push({d,a,b,m,e})})));
+  rows.sort((x,y)=>x.d.localeCompare(y.d)||x.a-y.a);
+  return `<h2>🗓️ Upcoming availability</h2>${rows.length?rows.slice(0,8).map(r=>`<div class="card row sp"><span>${badge('free')} <b>${esc(r.m.name)}</b> · ${fmtDay(r.d)} · ${tm(r.a)}–${tm(r.b)}</span><span class="mut">📍 ${esc(r.e.loc||'—')}</span></div>`).join(''):'<div class="card mut">No upcoming availability yet (past times are hidden). Tap “Add my availability”.</div>'}`}
+const U={tab:'dash',view:'week',day:TODAY,f:{min:6,dur:60,range:'7',date:TODAY,uids:[],loc:''}};
+const pages={
+dash(){SLOTS=[];const free=S.members.filter(m=>status(m.id).k==='free'),top=best(range(7),allIds(),2,60).slice(0,3),up=S.hangouts.filter(h=>h.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
+  return `<div class="card"><h1>${esc(S.group.name)}</h1><div class="mut">👥 ${S.members.length} members · ${fmtDay(TODAY,1)}</div>
+  <button class="pri" style="margin-top:8px" data-a="addAvail">＋ Add my availability</button></div>
+  <h2>🟢 Who's free now? (${free.length}/${S.members.length})</h2>
+  <div class="row">${free.length?free.map(m=>`<span class="pill free">${ICON.free} ${esc(m.name)}</span>`).join(''):'<span class="mut">Nobody has marked themselves free right now.</span>'}</div>
+  ${upcomingAvail()}<h2>⭐ Best times this week</h2>
+  ${top.length?top.map((s,i)=>slotCard(s,i,i==0?'Best time for a hangout:':'')).join(''):'<div class="card mut">No common free time yet. A best time needs at least 2 people free together, so ask friends to add their availability!</div>'}
+  <h2>📅 Upcoming hangouts</h2>${up.length?up.slice(0,3).map(hangCard).join(''):'<div class="card mut">Nothing planned yet.</div>'}
+  <h2>👥 Group members</h2>${S.members.map(memberRow).join('')}`},
+
+cal(){const v=U.view,d=U.day,tabs=['day','week','month'].map(x=>`<button class="${v===x?'pri':''}" data-a="view" data-v="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('');
+  const title=v==='month'?parseD(d).toLocaleDateString('en',{month:'long',year:'numeric'}):v==='week'?'Week of '+fmtDay(weekDates()[0]):fmtDay(d,1);
+  return `<div class="row sp"><div class="row">${tabs}</div><button class="pri" data-a="addAvail">＋ Add</button></div>
+  <div class="row sp" style="margin:10px 0"><button data-a="nav" data-v="-1">‹</button><b>${title}</b><div class="row"><button data-a="today">Today</button><button data-a="nav" data-v="1">›</button></div></div>
+  <div class="row" style="margin-bottom:8px">${['free','busy','away','hang'].map(k=>badge(k)).join('')}</div>
+  ${v==='week'?weekView():v==='day'?dayView():monthView()}`},
+
+find(){const f=U.f;
+  return `<h2 style="margin-top:6px">🔎 Find a time</h2><div class="card">
+  <div class="row"><div style="flex:1"><label>At least … people</label><input type="number" min="1" max="${S.members.length}" value="${f.min}" data-f="min"></div>
+  <div style="flex:1"><label>For at least</label><select data-f="dur">${[[30,'30 min'],[60,'1 hour'],[120,'2 hours'],[180,'3 hours']].map(([v,t])=>`<option value="${v}" ${f.dur==v?'selected':''}>${t}</option>`).join('')}</select></div></div>
+  <div class="row"><div style="flex:1"><label>When</label><select data-f="range">${[['7','Next 7 days'],['14','Next 14 days'],['wk','This weekend'],['date','Specific date']].map(([v,t])=>`<option value="${v}" ${f.range==v?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div style="flex:1"><label>Date</label><input type="date" value="${f.date}" data-f="date"></div></div>
+  <label>Location contains</label><input data-f="loc" placeholder="e.g. campus" value="${esc(f.loc)}">
+  <label>Only these members (none = everyone)</label><div class="row">${S.members.map(m=>`<label class="inl"><input type="checkbox" data-f="uid" value="${m.id}" ${f.uids.includes(m.id)?'checked':''}>${esc(m.name)}</label>`).join('')}</div></div>
+  <div id="results">${results()}</div>`},
+
+hang(){SLOTS=[];const up=S.hangouts.filter(h=>h.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start),sug=best(range(14),allIds(),2,60).slice(0,3);
+  return `<div class="row sp"><h2>📅 Hangouts</h2>${isAdmin()?'<button class="pri" data-a="newHang">＋ New</button>':''}</div>${up.length?up.map(hangCard).join(''):'<div class="card mut">No hangouts yet — pick a suggestion below.</div>'}
+  <h2>💡 Suggested hangouts</h2>${sug.length?sug.map((s,i)=>slotCard(s,i,i==0?'Best option':'Alternative')).join(''):'<div class="card mut">Add availability to get suggestions.</div>'}`},
+
+admin(){if(!isAdmin())return'<div class="card">Admins only.</div>';
+  return `<h2 style="margin-top:6px">👑 Admin</h2><div class="card"><div class="mut">Group</div><div class="big">${esc(S.group.name)}</div><button style="margin-top:6px" data-a="rename">Rename group</button>
+  <div class="mut" style="margin-top:10px">Invite code</div><div class="row sp"><span class="big">${esc(MYCODE||'…')}</span><span class="row"><button data-a="copy">Copy</button><button data-a="newCode">New code</button></span></div>
+  <div class="mut" style="margin-top:6px">Send friends the website link and this code. Create the group before sharing the link.</div></div>
+  <h2>Members (${S.members.length})</h2>${S.members.map(m=>`<div class="card"><div class="row sp"><b>${esc(m.name)}${m.admin?' 👑':''}</b>${m.id===UID?'<span class="mut">you</span>':`<button class="danger" data-a="removeMember" data-id="${m.id}">Remove</button>`}</div></div>`).join('')}`},
+
+settings(){const mine=S.avail.filter(e=>e.uid===S.me.id).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start),away=S.away.filter(w=>w.uid===S.me.id);
+  return `<h2 style="margin-top:6px">🙋 My details</h2><div class="card"><h3>My profile</h3><form data-f2="profile"><label>Username</label><input name="name" required value="${esc(S.me.name)}">
+  <label>Picture (an emoji)</label><input name="emoji" maxlength="2" value="${esc(S.me.emoji||'')}"><label>Status message</label><input name="msg" maxlength="60" value="${esc(S.me.msg||'')}"><br><br><button class="pri">Save profile</button></form></div>
+  <div class="card"><div class="row sp"><h3>✈️ Travel / away</h3><button data-a="addAway">＋ Add</button></div>
+  ${away.map(w=>`<div class="row sp" style="margin-top:6px"><span>Leaving ${new Date(w.from).toLocaleString('en',{weekday:'short',hour:'numeric',minute:'2-digit'})} → Back ${new Date(w.to).toLocaleString('en',{weekday:'short',hour:'numeric',minute:'2-digit'})}</span><button class="danger" data-a="delAway" data-id="${w.id}">✕</button></div>`).join('')||'<div class="mut">No trips planned.</div>'}</div>
+  <div class="card"><h3>My availability</h3>${mine.map(e=>`<div class="row sp" style="margin-top:6px"><span>${badge(e.type)} ${fmtDay(e.date)} ${tm(e.start)}–${tm(e.end)} · ${esc(e.loc)}</span><span class="row"><button data-a="editAvail" data-id="${e.id}">Edit</button><button class="danger" data-a="delAvail" data-id="${e.id}">✕</button></span></div>`).join('')||'<div class="mut">Nothing yet.</div>'}</div>
+  ${isAdmin()?'':'<button class="danger" data-a="leave">Leave group</button> '}`}};
+
+/* ---- Calendar views ---- */
+const weekDates=()=>{const d=parseD(U.day),off=(d.getDay()+6)%7;return[...Array(7)].map((_,i)=>addDays(U.day,i-off))};
+const chip=(k,t,id)=>`<button class="chip ${k}" data-a="detail" data-id="${id||''}">${ICON[k]} ${esc(t)}</button>`;
+function weekView(){const ds=weekDates();
+  const head=ds.map(d=>`<th class="${d===TODAY?'today':''}" data-a="day" data-d="${d}" style="cursor:pointer">${fmtDay(d)}</th>`).join('');
+  const rows=S.members.map(m=>`<tr><td><b>${esc(m.name)}</b></td>${ds.map(d=>{let h='';
+    entriesFor(m.id,d,'free').forEach(([a,b,e])=>h+=chip('free',`${tmS(a)}–${tmS(b)}`,e.id));
+    entriesFor(m.id,d,'busy').forEach(([a,b,e])=>h+=chip('busy',`${tmS(a)}–${tmS(b)}`,e.id));
+    if(awayIv(m.id,d).length)h+=chip('away','Away');
+    S.hangouts.filter(x=>x.date===d&&x.rsvp[m.id]==='going').forEach(x=>h+=chip('hang',x.title,'h'+x.id));
+    return `<td>${h||'<span class="mut">—</span>'}</td>`}).join('')}</tr>`).join('');
+  const tot=ds.map(d=>{const b=best([d],allIds(),1,30)[0];return `<td>${b?`<span class="pill free">${ICON.free} ${b.n}/${S.members.length}</span><div class="mut">${tmS(b.start)}–${tmS(b.end)}</div>`:'<span class="mut">None</span>'}</td>`}).join('');
+  return `<div class="scroll"><table><tr><th>Member</th>${head}</tr><tr><td><b>Best overlap</b></td>${tot}</tr>${rows}</table></div>`}
+function dayView(){const d=U.day,ticks=[...Array(8)].map((_,i)=>`<div class="tick" style="left:${i*12.5}%">${tmS(i*180)}</div>`).join('');
+  const bar=(a,b,k,t,id)=>`<button class="bar ${k}" style="left:${a/14.4}%;width:${Math.max((b-a)/14.4,2)}%" data-a="detail" data-id="${id||''}">${ICON[k]} ${esc(t)}</button>`;
+  const rows=S.members.map(m=>`<div class="row" style="flex-wrap:nowrap;gap:0"><div style="width:84px;flex:none;padding:4px;position:sticky;left:0;background:var(--card);z-index:1"><b>${esc(m.name)}</b></div><div class="tl" style="flex:1">
+    ${entriesFor(m.id,d,'free').map(([a,b,e])=>bar(a,b,'free',`${tmS(a)}–${tmS(b)} ${e.loc}`,e.id)).join('')}${entriesFor(m.id,d,'busy').map(([a,b,e])=>bar(a,b,'busy','Busy',e.id)).join('')}
+    ${awayIv(m.id,d).map(([a,b])=>bar(a,b,'away','Away')).join('')}${S.hangouts.filter(x=>x.date===d&&x.rsvp[m.id]==='going').map(x=>bar(x.start,x.end,'hang',x.title,'h'+x.id)).join('')}</div></div>`).join('');
+  return `<div class="scroll"><div style="min-width:1050px"><div class="row" style="flex-wrap:nowrap;gap:0"><div style="width:84px;flex:none"></div><div class="tl" style="flex:1;height:22px">${ticks}</div></div>${rows}</div></div>`}
+function monthView(){const f=parseD(U.day);f.setDate(1);const start=addDays(iso(f),-((f.getDay()+6)%7)),cells=[];
+  for(let i=0;i<42;i++){const d=addDays(start,i);if(i>=35&&parseD(d).getMonth()!==f.getMonth())break;const b=best([d],allIds(),1,30)[0],h=S.hangouts.some(x=>x.date===d);
+    cells.push(`<button class="mc" style="opacity:${parseD(d).getMonth()===f.getMonth()?1:.45}" data-a="day" data-d="${d}"><b>${parseD(d).getDate()}</b>${b?`<br><span class="pill free">${ICON.free}${b.n}/${S.members.length}</span>`:''}${h?'<br>📅':''}</button>`)}
+  return `<div class="month">${['M','T','W','T','F','S','S'].map(x=>`<div class="mut" style="text-align:center">${x}</div>`).join('')}${cells.join('')}</div>`}
+
+/* ---- Find Time results ---- */
+function results(){SLOTS=[];const f=U.f,uids=f.uids.length?f.uids:allIds(),loc=f.loc.trim().toLowerCase();
+  let ds=f.range==='wk'?range(14).filter(d=>[0,6].includes(parseD(d).getDay())).slice(0,2):f.range==='date'?[f.date]:range(+f.range);
+  const min=Math.min(f.min,uids.length),r=best(ds,uids,min,f.dur,loc);
+  if(r.length)return `<h3>${r.length} matching time${r.length>1?'s':''}</h3>${r.slice(0,10).map((s,i)=>slotCard(s,i,i==0?'⭐ Best match':'')).join('')}`;
+  const alt=best(ds,uids,2,f.dur,loc).slice(0,3);
+  return `<div class="card"><b>No time found with ${min}+ people.</b><div class="mut">Try fewer people, a shorter duration or a wider date range.</div></div>${alt.length?'<h3>Closest options</h3>'+alt.map(s=>slotCard(s,0)).join(''):''}`}
+
+/* ============ 6. FORMS & MODALS ============ */
+const openModal=h=>{$('#modal').innerHTML=`<div>${h}</div>`;$('#modal').classList.add('on')};
+const closeModal=()=>$('#modal').classList.remove('on');
+const close=`<button data-a="close" style="float:right">✕</button>`;
+function timeError(date,s,e,next){if(!date)return'Please pick a date.';if(!s||!e)return'Please enter both a start and an end time.';
+  if(toMin(e)===toMin(s))return'Start and end time cannot be the same.';
+  if(toMin(e)<toMin(s)&&!next)return'End time is before start time. Tick "Ends next day" if it runs past midnight.';return''}
+function availForm(e={}){const edit=!!e.id;
+  openModal(`${close}<h2 style="margin-top:0">${edit?'Edit':'Add'} availability</h2><form data-f2="avail"><input type="hidden" name="id" value="${e.id||''}">
+  <input type="hidden" name="type" value="${e.type==='busy'?'busy':'free'}"><div class="row"><button type="button" style="flex:1;padding:12px" class="${e.type!=='busy'?'pri':''}" data-a="pickType" data-v="free">✅ Free</button><button type="button" style="flex:1;padding:12px" class="${e.type==='busy'?'pri':''}" data-a="pickType" data-v="busy">⛔ Busy</button></div>
+  <label>Date</label><input type="date" name="date" value="${e.date||U.day}" required>
+  <div class="row"><div style="flex:1"><label>From</label><input type="time" name="start" value="${e.start!=null?toTime(e.start):'15:00'}"></div><div style="flex:1"><label>Until</label><input type="time" name="end" value="${e.end!=null?toTime(e.end):'20:00'}"></div></div>
+  <label class="inl"><input type="checkbox" name="next" ${e.nextDay?'checked':''}> Ends next day (past midnight)</label>
+  <label>Location</label><input name="loc" list="locs" value="${esc(e.loc||'')}" placeholder="SRM Campus, Home, Cafe…"><datalist id="locs">${LOCS.map(l=>`<option>${l}</option>`).join('')}</datalist>
+  <label>Travel / transport (optional)</label><input name="transport" value="${esc(e.transport||'')}" placeholder="Walking, bus…"><label>Notes (optional)</label><input name="note" value="${esc(e.note||'')}">
+  <div class="err" id="err"></div><br><button class="pri">Save</button></form>`)}
+function hangForm(h={}){const inv=h.rsvp?Object.keys(h.rsvp):allIds();
+  openModal(`${close}<h2 style="margin-top:0">${h.id?'Edit':'New'} hangout</h2><form data-f2="hang"><input type="hidden" name="id" value="${h.id||''}">
+  <label>Title</label><input name="title" required value="${esc(h.title||'')}" placeholder="Saturday Movie"><label>Date</label><input type="date" name="date" required value="${h.date||U.day}">
+  <div class="row"><div style="flex:1"><label>Start</label><input type="time" name="start" value="${toTime(h.start??1080)}"></div><div style="flex:1"><label>End</label><input type="time" name="end" value="${toTime(h.end??1260)}"></div></div>
+  <label>Location</label><input name="loc" list="locs" value="${esc(h.loc||'')}"><datalist id="locs">${LOCS.map(l=>`<option>${l}</option>`).join('')}</datalist><label>Description</label><input name="desc" value="${esc(h.desc||'')}">
+  <label>Invite</label><div class="row">${S.members.map(m=>`<label class="inl"><input type="checkbox" name="inv" value="${m.id}" ${inv.includes(m.id)?'checked':''}>${esc(m.name)}</label>`).join('')}</div>
+  <div class="err" id="err"></div><br><button class="pri">Save hangout</button></form>`)}
+function detail(id){if(!id)return;
+  if(id[0]==='h'){U.tab='hang';closeModal();return render()}
+  const e=S.avail.find(x=>x.id===id);if(!e)return;const m=mem(e.uid);
+  openModal(`${close}<h2 style="margin-top:0">${esc(m.name)}</h2>${badge(e.type)}<p><b>${fmtDay(e.date,1)}</b><br>🕒 ${tm(e.start)} – ${tm(e.end)}${e.nextDay?' (next day)':''}<br>📍 ${esc(e.loc||'Not set')}${e.transport?'<br>🚶 '+esc(e.transport):''}${e.note?'<br>📝 '+esc(e.note):''}</p>
+  ${e.uid===S.me.id||isAdmin()?`<div class="row">${e.uid===S.me.id?`<button data-a="editAvail" data-id="${e.id}">Edit</button>`:''}<button class="danger" data-a="delAvail" data-id="${e.id}">Delete</button></div>`:''}`)}
+function awayForm(){openModal(`${close}<h2 style="margin-top:0">✈️ Travel plans</h2><form data-f2="away"><label>Leaving</label><input type="datetime-local" name="from" required><label>Returning</label><input type="datetime-local" name="to" required><div class="err" id="err"></div><br><button class="pri">Save</button></form>`)}
+function bell(){S.notes.forEach(n=>n.read=true);try{localStorage.setItem('hp-seen',Date.now())}catch(e){}openModal(`${close}<h2 style="margin-top:0">🔔 Notifications</h2>${S.notes.map(n=>`<div class="card">${esc(n.t)}<div class="mut">${new Date(n.time).toLocaleString('en',{weekday:'short',hour:'numeric',minute:'2-digit'})}</div></div>`).join('')||'<p class="mut">All quiet.</p>'}`);render()}
+
+/* ============ 7. EVENT HANDLERS ============ */
+const A={
+close:closeModal,tab:d=>{U.tab=d.id;render()},view:d=>{U.view=d.v;render()},today:()=>{U.day=TODAY;render()},
+day:d=>{U.day=d.d;U.view='day';render()},detail:d=>detail(d.id),bell,
+nav:d=>{const n=+d.v,x=parseD(U.day);if(U.view==='month')x.setMonth(x.getMonth()+n);else x.setDate(x.getDate()+n*(U.view==='week'?7:1));U.day=iso(x);render()},
+addAvail:()=>availForm(),editAvail:d=>availForm(S.avail.find(e=>e.id===d.id)),
+delAvail:d=>{S.avail=S.avail.filter(e=>e.id!==d.id);note('You removed an availability entry.');save();closeModal();render()},
+newHang:()=>hangForm(),editHang:d=>hangForm(S.hangouts.find(h=>h.id===d.id)),
+slotHang:d=>{if(!isAdmin())return;const s=SLOTS[+d.i],c={};s.who.forEach(w=>c[w[1]]=(c[w[1]]||0)+1);U.day=s.date;
+  hangForm({date:s.date,start:s.start,end:Math.min(s.end,s.start+240),loc:Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0],rsvp:Object.fromEntries(S.members.map(m=>[m.id,'']))})},
+delHang:d=>{S.hangouts=S.hangouts.filter(h=>h.id!==d.id);save();render()},
+rsvp:d=>{const h=S.hangouts.find(x=>x.id===d.id);h.rsvp[S.me.id]=d.v;note(`You responded "${d.v==='no'?"Can't go":d.v}" to ${h.title}.`);save();render()},
+addAway:awayForm,delAway:d=>{S.away=S.away.filter(w=>w.id!==d.id);save();render()},
+copy:()=>{try{navigator.clipboard.writeText(S.group.code)}catch(e){}alert('Code: '+S.group.code)},
+leave:()=>{if(!confirm('Leave this group? Your availability will be removed.'))return;const id=S.me.id;
+  S.members=S.members.filter(m=>m.id!==id);S.avail=S.avail.filter(e=>e.uid!==id);S.away=S.away.filter(w=>w.uid!==id);S.hangouts.forEach(h=>delete h.rsvp[id]);
+  S.me=null;if(!S.members.length)S.group=null;save();render()},
+reset:()=>{if(confirm('Erase everything on this device?')){localStorage.removeItem('hangout-planner-v2');location.reload()}},
+rename:()=>{const n=prompt('New group name',S.group.name);if(n&&n.trim()){S.group.name=n.trim();note('Group renamed to '+S.group.name+'.');save();render()}},
+newCode:()=>{S.group.code='HANG-'+newId().slice(0,4).toUpperCase();note('Invite code was changed.');save();render()},
+toggleAdmin:d=>{const m=mem(d.id);m.admin=!m.admin;note(m.name+(m.admin?' is now an admin.':' is no longer an admin.'));save();render()},
+removeMember:d=>{const m=mem(d.id);if(!confirm('Remove '+m.name+' from the group?'))return;S.members=S.members.filter(x=>x.id!==d.id);S.avail=S.avail.filter(e=>e.uid!==d.id);S.away=S.away.filter(w=>w.uid!==d.id);S.hangouts.forEach(h=>delete h.rsvp[d.id]);note(m.name+' was removed from the group.');save();render()},
+clearNotes:()=>{S.notes=[];save();render()},
+logout:()=>{S.me=null;save();U.tab='dash';closeModal();render()},
+login:d=>{S.me=S.members.find(m=>m.id===d.id);save();U.tab='dash';render()},
+create:()=>{const n=$('#nm').value.trim(),g=$('#gn').value.trim();if(!n||!g)return $('#oerr').textContent='Enter your username and a group name.';
+  if(S.group&&!confirm('This replaces the group saved on this device. Continue?'))return;S.me={id:newId(),name:n,emoji:'😀',msg:'',admin:true};const code='HANG-'+newId().slice(0,4).toUpperCase();
+  if($('#demo').checked)seedDemo(g,code);else{S.group={name:g,code};S.members=[S.me];S.avail=[];S.away=[];S.hangouts=[]}
+  note('You created the group.');save();render()},
+join:()=>{const n=$('#nm').value.trim(),c=$('#code').value.trim().toUpperCase();if(!n)return $('#oerr').textContent='Enter a username first.';
+  if(c==='HANG-2026'||c===S.group?.code){S.me={id:newId(),name:n,emoji:'😀',msg:'',admin:false};if(!S.group)seedDemo('SRM Friends','HANG-2026');else S.members.push(S.me);note(n+' joined the group.');save();render()}
+  else $('#oerr').textContent='Code not found. In this demo, try HANG-2026.'}};
+
+const F={ // form submit handlers
+avail(f,fd){const o=Object.fromEntries(fd),err=timeError(o.date,o.start,o.end,!!o.next);if(err)return $('#err').textContent=err;
+  const e={id:o.id||newId(),uid:S.me.id,date:o.date,start:toMin(o.start),end:toMin(o.end),nextDay:!!o.next,loc:o.loc.trim(),type:o.type,transport:o.transport,note:o.note};
+  const clash=S.avail.some(x=>x.id!==e.id&&x.uid===e.uid&&x.type===e.type&&x.date===e.date&&x.start<e.end&&e.start<x.end);
+  S.avail=S.avail.filter(x=>x.id!==e.id);S.avail.push(e);note(`You ${o.id?'changed':'added'} availability for ${fmtDay(e.date)}${clash?' (merged with an overlapping entry)':''}.`);
+  S.hangouts.filter(h=>h.date===e.date&&h.rsvp[S.me.id]==='going').length&&note('A hangout falls on a day you changed — check it still works.');
+  save();closeModal();render()},
+hang(f,fd){const o=Object.fromEntries(fd),err=timeError(o.date,o.start,o.end,false);if(err)return $('#err').textContent=err;
+  const old=S.hangouts.find(h=>h.id===o.id),inv=fd.getAll('inv');if(!inv.length)return $('#err').textContent='Invite at least one member.';
+  const h={id:o.id||newId(),title:o.title,date:o.date,start:toMin(o.start),end:toMin(o.end),loc:o.loc,desc:o.desc,creator:old?.creator||S.me.id,rsvp:Object.fromEntries(inv.map(u=>[u,old?.rsvp[u]||'']))};
+  if(old){S.hangouts=S.hangouts.filter(x=>x.id!==old.id);if(old.date!==h.date||old.start!==h.start||old.loc!==h.loc)note(`${h.title} was changed: ${fmtDay(h.date)}, ${tm(h.start)}, ${h.loc||'TBD'}.`)}
+  else{h.rsvp[S.me.id]='going';note(`New hangout: ${h.title} on ${fmtDay(h.date)}.`)}
+  S.hangouts.push(h);save();closeModal();U.tab='hang';render()},
+profile(f,fd){const o=Object.fromEntries(fd);Object.assign(S.me,{name:o.name.trim()||S.me.name,emoji:o.emoji,msg:o.msg});save();render()},
+away(f,fd){const o=Object.fromEntries(fd);if(new Date(o.to)<=new Date(o.from))return $('#err').textContent='Return time must be after you leave.';
+  S.away.push({id:newId(),uid:S.me.id,from:o.from,to:o.to});note('You updated your travel plans.');save();closeModal();render()}};
+
+/* ---- Shared-database actions ---- */
+Object.assign(A,{
+pickType:d=>{document.querySelector('[name=type]').value=d.v;document.querySelectorAll('[data-a=pickType]').forEach(b=>b.classList.toggle('pri',b.dataset.v===d.v))},
+setup:async()=>{const n=$('#nm').value.trim(),g=$('#gn').value.trim(),er=$('#oerr');if(!n||!g)return er.textContent='Enter your username and a group name.';
+  try{await DB.doc('secret/main').set({code:norm(genCode())});await DB.doc('members/'+UID).set({name:n,emoji:'😀',msg:'',joined:Date.now()});await DB.doc('group/main').set({name:g,ownerId:UID});
+  S.me={name:n};note('You created the group.');U.tab='admin'}catch(e){er.textContent='Could not create the group: '+(e.code||e.message)}},
+join:async()=>{const n=$('#nm').value.trim(),er=$('#oerr');if(!n)return er.textContent='Enter a username.';
+  try{await DB.doc('members/'+UID).set({name:n,emoji:'😀',msg:'',joined:Date.now(),code:norm($('#code').value)});S.me={name:n};note(n+' joined the group.')}
+  catch(e){await new Promise(r=>setTimeout(r,1200));er.textContent='Could not join. Check the invite code (or you may have been removed).'}},
+delAvail:d=>{const e=S.avail.find(x=>x.id===d.id);if(!e)return;S.avail=S.avail.filter(x=>x.id!==d.id);note('You removed an availability entry.');queue(()=>writeFor(e.uid));closeModal();render()},
+rsvp:d=>{const h=S.hangouts.find(x=>x.id===d.id),map={...RSM(UID),[h.id]:d.v};queue(()=>DB.doc('rsvps/'+UID).set({map}));note(`You responded "${d.v==='no'?"Can't go":d.v}" to ${h.title}.`)},
+delHang:d=>{if(confirm('Delete this hangout?'))queue(()=>DB.doc('hangouts/'+d.id).delete())},
+rename:()=>{const n=prompt('New group name',S.group.name);if(n&&n.trim()){queue(()=>DB.doc('group/main').update({name:n.trim().slice(0,40)}));note('Group renamed.')}},
+newCode:()=>{if(!confirm('Make a new invite code? The old one stops working for new joiners.'))return;queue(()=>DB.doc('secret/main').set({code:norm(genCode())}));note('Invite code was changed.')},
+copy:()=>{try{navigator.clipboard.writeText(MYCODE)}catch(e){}alert('Invite code: '+MYCODE)},
+removeMember:d=>{const m=mem(d.id);if(!confirm('Remove '+m.name+' from the group?'))return;
+  queue(async()=>{await DB.doc('banned/'+d.id).set({t:Date.now()});await DB.doc('avail/'+d.id).delete();await DB.doc('rsvps/'+d.id).delete();await DB.doc('members/'+d.id).delete()});note(m.name+' was removed from the group.')},
+leave:()=>{if(!confirm('Leave this group? Your availability will be deleted.'))return;note('You left the group.');
+  queue(async()=>{await DB.doc('avail/'+UID).delete();await DB.doc('rsvps/'+UID).delete();await DB.doc('members/'+UID).delete()})}});
+Object.assign(F,{
+profile(f,fd){const o=Object.fromEntries(fd);queue(()=>DB.doc('members/'+UID).set({name:(o.name.trim()||S.me.name).slice(0,30),emoji:o.emoji.slice(0,2),msg:o.msg.slice(0,60),joined:S.me.joined||Date.now()}))},
+hang(f,fd){if(!isAdmin())return;const o=Object.fromEntries(fd),err=timeError(o.date,o.start,o.end,false);if(err)return $('#err').textContent=err;
+  const inv=fd.getAll('inv');if(!inv.length)return $('#err').textContent='Invite at least one member.';
+  const old=S.hangouts.find(h=>h.id===o.id),id=o.id||newId(),h={title:o.title,date:o.date,start:toMin(o.start),end:toMin(o.end),loc:o.loc||'',desc:o.desc||'',creator:old?.creator||UID,invited:inv};
+  if(!old){note(`New hangout: ${h.title} on ${fmtDay(h.date)}.`);queue(()=>DB.doc('rsvps/'+UID).set({map:{...RSM(UID),[id]:'going'}}))}
+  else if(old.date!==h.date||old.start!==h.start||old.loc!==h.loc)note(`${h.title} was changed: ${fmtDay(h.date)}, ${tm(h.start)}, ${h.loc||'TBD'}.`);
+  queue(()=>DB.doc('hangouts/'+id).set(h));closeModal();U.tab='hang';render()}});
+
+document.addEventListener('click',e=>{if(e.target.id==='modal')return closeModal();const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a])A[b.dataset.a](b.dataset)});
+document.addEventListener('submit',e=>{const k=e.target.dataset.f2;if(k){e.preventDefault();F[k](e.target,new FormData(e.target))}});
+document.addEventListener('input',e=>{const k=e.target.dataset.f;if(!k)return;const f=U.f;
+  if(k==='uid')f.uids=[...document.querySelectorAll('[data-f=uid]:checked')].map(x=>x.value);
+  else f[k]=['min','dur'].includes(k)?+e.target.value||1:e.target.value;
+  if(k==='date')f.range='date';$('#results').innerHTML=results()});
+document.addEventListener('keydown',e=>e.key==='Escape'&&closeModal());
+
+/* ============ 8. RENDER ============ */
+function onboarding(){const box=h=>`<div class="card" style="margin-top:20px"><h1>📅 Hangout Planner</h1>${h}</div>`;
+  if(!READY)return box('<p class="mut">Loading your group…</p>');
+  if(MSG)return box(`<p>${esc(MSG)}</p>`);
+  if(!S.group)return box(`<p class="mut">No group exists yet. Whoever creates it becomes the admin — do this before sharing the link.</p><label>Your username</label><input id="nm" maxlength="30"><label>Group name</label><input id="gn" maxlength="40"><br><br><button class="pri" data-a="setup">Create group</button><div class="err" id="oerr"></div>`);
+  return box(`<h2 style="margin-top:0">${esc(S.group.name)}</h2><p class="mut">Enter a username and the invite code from your admin.</p><label>Username</label><input id="nm" maxlength="30"><label>Invite code</label><input id="code" placeholder="XXXXX-XXXXX" autocomplete="off"><br><br><button class="pri" data-a="join">Join group</button><div class="err" id="oerr"></div>`)}
+function render(){const app=$('#app');if(READY&&!CAN){$('#top').innerHTML='';$('#nav').innerHTML='';app.innerHTML='<div class="card" style="margin-top:20px">You have view-only access. Ask the owner to share the page with you as a <b>Contributor</b>.</div>';return}
+  if(!S.me||!S.group){$('#top').innerHTML='';$('#nav').innerHTML='';app.innerHTML=onboarding();return}
+  const unread=S.notes.filter(n=>!n.read).length;
+  $('#top').innerHTML=`<b>📅 ${esc(S.group.name)}</b><span class="row"><button data-a="bell">🔔${unread?` <b>${unread}</b>`:''}</button></span>`;
+  $('#nav').innerHTML=[['dash','🏠','Home'],['cal','🗓️','Calendar'],['find','🔎','Find Time'],['hang','🎉','Hangouts'],...(isAdmin()?[['admin','👑','Admin']]:[]),['settings','🙋','Me']].map(([id,i,t])=>`<button class="${U.tab===id?'on':''}" data-a="tab" data-id="${id}"><b>${i}</b>${t}</button>`).join('');
+  app.innerHTML=pages[U.tab]()}
+render();addEventListener('DOMContentLoaded',start);
+</script></body></html>
